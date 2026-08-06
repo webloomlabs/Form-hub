@@ -1,0 +1,87 @@
+# Local dev needs only `postgres`, `mailpit` and `minio`:
+#   docker compose up -d postgres mailpit minio
+# The `web` and `worker` services are the VPS deployment path; bring them up
+# with `docker compose --profile deploy up -d --build`.
+services:
+  web:
+    profiles: ["deploy"]
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    environment:
+      DATABASE_URL: postgresql://formhub:formhub@postgres:5432/formhub?schema=public
+    env_file:
+      - .env.local
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    profiles: ["deploy"]
+    build:
+      context: .
+      target: worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://formhub:formhub@postgres:5432/formhub?schema=public
+    env_file:
+      - .env.local
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: formhub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: formhub
+      POSTGRES_PASSWORD: formhub
+      POSTGRES_DB: formhub
+    # 5433 on the host: 5432 is commonly taken by other local projects.
+    ports:
+      - "5433:5432"
+    volumes:
+      - formhub-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U formhub -d formhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Local SMTP sink. UI at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: formhub-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  # S3-compatible storage for local dev, standing in for Cloudflare R2.
+  # Console at http://localhost:9101 (formhub / formhub123).
+  minio:
+    image: minio/minio:latest
+    container_name: formhub-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: formhub
+      MINIO_ROOT_PASSWORD: formhub123
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    volumes:
+      - formhub-minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  formhub-pgdata:
+  formhub-minio:

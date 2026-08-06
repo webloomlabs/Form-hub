@@ -1,0 +1,440 @@
+// FormHub — reliable form submissions for static sites.
+//
+// Tenancy rule: every tenant-owned table carries `agencyId`, and every query
+// filters by it. Client-scoped reads additionally filter by `clientId`.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+// Prisma 7: the connection URL lives in prisma.config.ts (CLI) and is passed
+// to PrismaClient via the pg adapter at runtime — see lib/prisma.ts.
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── ENUMS ─────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  AGENCY_OWNER
+  AGENCY_STAFF
+  CLIENT
+}
+
+enum AgencyStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ClientStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SiteStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum FormStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum RecipientKind {
+  TO
+  CC
+  BCC
+}
+
+enum SubmissionStatus {
+  NEW
+  READ
+  ARCHIVED
+  SPAM
+}
+
+enum DeliveryKind {
+  EMAIL_ALERT
+  WEBHOOK_FORWARD
+}
+
+enum DeliveryStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  DEAD
+}
+
+enum AttemptStatus {
+  SUCCEEDED
+  FAILED
+}
+
+// ─────────────────────────── ORGANIZATION ───────────────────────────
+
+model Agency {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  status    AgencyStatus @default(ACTIVE)
+
+  // Plan limits. Enforced at ingest and upload time.
+  maxSites                Int @default(25)
+  maxSubmissionsPerMonth  Int @default(10000)
+  maxStorageBytes         BigInt @default(5368709120) // 5 GiB
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  smtpConfig  AgencySmtpConfig?
+  users       User[]
+  clients     Client[]
+  sites       Site[]
+  forms       Form[]
+  submissions Submission[]
+  files       SubmissionFile[]
+  webhooks    WebhookEndpoint[]
+  invites     Invite[]
+  jobs        DeliveryJob[]
+
+  @@map("agencies")
+}
+
+/// Optional per-agency SMTP. Kept in its own table so credentials are never
+/// pulled in by an incidental `include: { agency: true }`.
+model AgencySmtpConfig {
+  id       String @id @default(cuid())
+  agencyId String @unique
+
+  host        String
+  port        Int     @default(587)
+  secure      Boolean @default(false)
+  username    String
+  passwordEnc String // AES-256-GCM, see lib/crypto.ts
+  fromName    String
+  fromEmail   String
+  verifiedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@map("agency_smtp_configs")
+}
+
+/// A website owner — the agency's customer. Owns one or more sites.
+model Client {
+  id       String       @id @default(cuid())
+  agencyId String
+  name     String
+  contactEmail String
+  status   ClientStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agency  Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  users   User[]
+  sites   Site[]
+  invites Invite[]
+
+  @@index([agencyId, createdAt(sort: Desc), id(sort: Desc)])
+  @@map("clients")
+}
+
+// ─────────────────────────────── USERS ───────────────────────────────
+
+/// One table for every human. `role` decides which portal they may log into:
+/// AGENCY_* => agencyId set, clientId null.  CLIENT => both set.
+/// SUPER_ADMIN => both null.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  role         UserRole
+  agencyId     String?
+  clientId     String?
+  lastLoginAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agency        Agency?  @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client        Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invitesSent   Invite[] @relation("InviteCreatedBy")
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@map("users")
+}
+
+/// Emailed invitation for a website owner. Only the SHA-256 hash of the token
+/// is stored; the raw token exists solely in the emailed link.
+model Invite {
+  id         String   @id @default(cuid())
+  agencyId   String
+  clientId   String
+  email      String
+  tokenHash  String   @unique
+  role       UserRole @default(CLIENT)
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdById String?
+
+  createdAt DateTime @default(now())
+
+  agency    Agency  @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("InviteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([agencyId, createdAt(sort: Desc)])
+  @@index([email])
+  @@map("invites")
+}
+
+// ────────────────────────── SITES & FORMS ──────────────────────────
+
+model Site {
+  id       String     @id @default(cuid())
+  agencyId String
+  clientId String?
+  name     String
+  /// Allowed origins, stored as full origins e.g. "https://example.com".
+  domains  String[]   @default([])
+  status   SiteStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agency      Agency       @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client      Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  forms       Form[]
+  submissions Submission[]
+
+  @@index([agencyId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([clientId])
+  @@map("sites")
+}
+
+model Form {
+  id       String     @id @default(cuid())
+  agencyId String
+  siteId   String
+  name     String
+  /// The URL segment: POST /f/{publicKey}. Random 24 chars, not a cuid.
+  publicKey String    @unique
+  status   FormStatus @default(ACTIVE)
+
+  // Where a native HTML POST lands after submitting.
+  redirectUrl      String?
+  redirectErrorUrl String?
+
+  // ── Spam controls ──
+  honeypotField     String  @default("_hp")
+  minSubmitSeconds  Int     @default(3)
+  requireOriginMatch Boolean @default(true)
+  turnstileEnabled  Boolean @default(false)
+  turnstileSecretEnc String?
+
+  // ── Payload limits ──
+  /// Empty = accept every field. Otherwise an allowlist.
+  allowedFields   String[] @default([])
+  maxFieldCount   Int      @default(50)
+  maxFieldLength  Int      @default(10000)
+
+  // ── Upload limits ──
+  uploadsEnabled      Boolean  @default(false)
+  maxTotalUploadBytes Int      @default(4000000) // stays under Vercel's ~4.5MB body cap
+  allowedMimeTypes    String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agency      Agency          @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  site        Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  recipients  FormRecipient[]
+  submissions Submission[]
+  webhooks    WebhookEndpoint[]
+
+  @@index([agencyId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([siteId])
+  @@map("forms")
+}
+
+/// Who receives the email alert for a form.
+model FormRecipient {
+  id      String        @id @default(cuid())
+  formId  String
+  email   String
+  kind    RecipientKind @default(TO)
+  enabled Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+
+  form Form @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, email, kind])
+  @@index([formId])
+  @@map("form_recipients")
+}
+
+/// Optional relay of each submission to the agency's own URL.
+/// `formId` null = applies to every form in the agency.
+model WebhookEndpoint {
+  id        String  @id @default(cuid())
+  agencyId  String
+  formId    String?
+  url       String
+  secretEnc String
+  enabled   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  form   Form?  @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([formId])
+  @@map("webhook_endpoints")
+}
+
+// ───────────────────────────── SUBMISSIONS ─────────────────────────────
+
+model Submission {
+  id       String @id @default(cuid())
+  agencyId String
+  formId   String
+  siteId   String
+
+  /// The submitted fields, minus honeypot/control fields.
+  data Json
+
+  /// First meaningful line, for list views.
+  subjectPreview String?
+  /// Normalised email pulled out of the payload; used for Reply-To and search.
+  submitterEmail String?
+
+  ip        String?
+  userAgent String?
+  origin    String?
+
+  status      SubmissionStatus @default(NEW)
+  spamReasons String[]         @default([])
+  /// Set when uploads were expected but R2 failed — the text was still saved.
+  uploadError String?
+
+  /// sha256(formId + canonical(data) + 60s bucket). Collapses double-submits.
+  dedupeKey String?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  form   Form   @relation(fields: [formId], references: [id], onDelete: Cascade)
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  files SubmissionFile[]
+  jobs  DeliveryJob[]
+
+  // Keyset pagination: WHERE (createdAt, id) < ($1, $2)
+  @@index([agencyId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([siteId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([formId, status, createdAt(sort: Desc)])
+  @@index([dedupeKey])
+  @@map("submissions")
+}
+
+model SubmissionFile {
+  id           String @id @default(cuid())
+  agencyId     String
+  submissionId String
+  fieldName    String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  /// Object key in R2. Signed on demand — never a public URL.
+  r2Key        String
+
+  createdAt DateTime @default(now())
+
+  agency     Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([agencyId])
+  @@map("submission_files")
+}
+
+// ────────────────────────────── DELIVERY ──────────────────────────────
+
+/// The durability mechanism. Rows are written in the same transaction as the
+/// submission, then drained by lib/delivery/tick.ts.
+model DeliveryJob {
+  id           String         @id @default(cuid())
+  agencyId     String
+  submissionId String
+  kind         DeliveryKind
+  status       DeliveryStatus @default(PENDING)
+
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(6)
+  runAfter    DateTime @default(now())
+
+  lockedAt  DateTime?
+  lockedBy  String?
+  lastError String?
+
+  /// Recipients / target URL snapshotted at enqueue time, so later config
+  /// edits never change what an in-flight job does.
+  payload Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agency     Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  submission Submission        @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  attemptLog DeliveryAttempt[]
+
+  // The claim query: WHERE status='PENDING' AND runAfter <= now()
+  @@index([status, runAfter])
+  @@index([submissionId])
+  @@index([agencyId, createdAt(sort: Desc), id(sort: Desc)])
+  @@map("delivery_jobs")
+}
+
+/// One row per send attempt. This is what the delivery log renders.
+model DeliveryAttempt {
+  id        String        @id @default(cuid())
+  jobId     String
+  attemptNo Int
+  status    AttemptStatus
+  startedAt DateTime
+  finishedAt DateTime?
+  error     String?
+  responseCode Int?
+
+  job DeliveryJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, attemptNo])
+  @@map("delivery_attempts")
+}
+
+// ─────────────────────────── INFRASTRUCTURE ───────────────────────────
+
+/// Fixed-window rate limit counters. Swept periodically by the cron route.
+model RateLimitCounter {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limit_counters")
+}

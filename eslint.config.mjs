@@ -12,7 +12,19 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Prisma 7 generates its client into the app directory.
+    "app/generated/**",
   ]),
+  {
+    rules: {
+      // `useActionState` fixes the (prevState, formData) signature, so actions
+      // that ignore one of them still have to declare it.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;
