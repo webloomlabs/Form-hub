@@ -5,7 +5,7 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-function createClient() {
+function createClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set");
@@ -19,8 +19,28 @@ function createClient() {
   });
 }
 
-export const prisma = globalForPrisma.prisma ?? createClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+function getClient(): PrismaClient {
+  const existing = globalForPrisma.prisma;
+  if (existing) return existing;
+  const client = createClient();
+  // Reused across HMR reloads in dev, and across warm invocations in prod.
+  globalForPrisma.prisma = client;
+  return client;
 }
+
+/**
+ * Lazily-constructed Prisma client.
+ *
+ * The connection is only opened on first *use*, not on import. `next build`
+ * evaluates every route module while collecting page data, so constructing
+ * eagerly would make DATABASE_URL a build-time requirement and fail any CI
+ * build without database credentials. Behaviour at runtime is unchanged.
+ */
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getClient(), prop, receiver);
+  },
+  has(_target, prop) {
+    return Reflect.has(getClient(), prop);
+  },
+}) as PrismaClient;

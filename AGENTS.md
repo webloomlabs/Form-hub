@@ -98,6 +98,16 @@ Seeded logins (password `password123`): `agency@formhub.test` at
 The delivery queue drains via `/api/cron/deliver` (needs the `CRON_SECRET`
 bearer) or `npm run worker`.
 
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md). Two things that bite:
+
+- The generated Prisma client is gitignored; `npm run build` runs
+  `prisma generate` first. Don't commit `app/generated/`.
+- `lib/prisma.ts` builds the client lazily behind a Proxy so importing it
+  doesn't need `DATABASE_URL` — `next build` evaluates every route module, and
+  an eager client would make the database a build-time dependency. Keep it lazy.
+
 ## Verification scripts
 
 ```bash

@@ -116,4 +116,5 @@ positive never costs a real enquiry and a bot never learns it was caught.
   covers the common case; sub-second alerting is the reason to move to the
   Docker worker.
 
-See [AGENTS.md](AGENTS.md) for conventions and the invariants to preserve.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for deploying to Vercel + Neon + R2, and
+[AGENTS.md](AGENTS.md) for conventions and the invariants to preserve.
