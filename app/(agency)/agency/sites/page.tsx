@@ -3,6 +3,8 @@ import { requireAgency } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Globe } from "lucide-react";
+import { PageHeader, EmptyState } from "@/components/page-header";
 import {
   EditSiteDialog,
   NewFormDialog,
@@ -43,21 +45,20 @@ export default async function SitesPage() {
   const clientOptions: ClientOption[] = clients;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sites</h1>
-          <p className="text-sm text-muted-foreground">
-            Each site owns the forms that post to FormHub.
-          </p>
-        </div>
-        <NewSiteDialog clients={clientOptions} />
-      </div>
+    <>
+      <PageHeader
+        title="Sites"
+        description="Each site owns the forms that post to FormHub."
+        actions={<NewSiteDialog clients={clientOptions} />}
+      />
 
       {sites.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No sites yet.
-        </p>
+        <EmptyState
+          icon={Globe}
+          title="No sites yet"
+          description="Register a site and the origins its forms will post from, then add a form to get an endpoint."
+          action={<NewSiteDialog clients={clientOptions} />}
+        />
       ) : (
         <div className="space-y-4">
           {sites.map((site) => (
@@ -140,6 +141,6 @@ export default async function SitesPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

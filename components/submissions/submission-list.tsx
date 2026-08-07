@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Paperclip } from "lucide-react";
+import { Inbox, Paperclip } from "lucide-react";
+import { EmptyState } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -47,14 +48,16 @@ export function SubmissionList({
 }) {
   if (items.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-        No submissions match this view.
-      </p>
+      <EmptyState
+        icon={Inbox}
+        title="Nothing here"
+        description="No submissions match this view. Try a different filter or clear your search."
+      />
     );
   }
 
   return (
-    <div className="rounded-lg border">
+    <div className="bg-card overflow-x-auto rounded-xl border shadow-xs">
       <Table>
         <TableHeader>
           <TableRow>
@@ -67,15 +70,16 @@ export function SubmissionList({
         </TableHeader>
         <TableBody>
           {items.map((s) => (
-            <TableRow
-              key={s.id}
-              className={s.status === "NEW" ? "font-medium" : undefined}
-            >
+            <TableRow key={s.id}>
               <TableCell>{statusBadge(s.status, s.spamReasons)}</TableCell>
               <TableCell>
                 <Link
                   href={`${basePath}/${s.id}`}
-                  className="underline-offset-4 hover:underline"
+                  className={
+                    s.status === "NEW"
+                      ? "font-medium underline-offset-4 hover:underline"
+                      : "underline-offset-4 hover:underline"
+                  }
                 >
                   {s.subjectPreview ?? "(no preview)"}
                 </Link>

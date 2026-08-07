@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { Input } from "@/components/ui/input";
 
 const TABS = [
@@ -27,18 +27,18 @@ export function SubmissionFilters({
   counts: Record<string, number>;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-2 shadow-xs">
       <nav className="flex flex-wrap gap-1">
         {TABS.map((tab) => {
           const active = status === tab.key;
           const href = tab.key ? `${basePath}?status=${tab.key}` : basePath;
           const count = tab.key === "SPAM" ? counts.SPAM : undefined;
           return (
-            <Button
+            <ButtonLink
               key={tab.key || "inbox"}
               size="sm"
               variant={active ? "secondary" : "ghost"}
-              render={<Link href={href} />}
+              href={href}
             >
               {tab.label}
               {count ? (
@@ -46,7 +46,7 @@ export function SubmissionFilters({
                   {count}
                 </span>
               ) : null}
-            </Button>
+            </ButtonLink>
           );
         })}
       </nav>

@@ -3,7 +3,8 @@ import { requireAgency } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader, EmptyState } from "@/components/page-header";
+import { StatGrid, type Stat } from "@/components/stat-card";
 import {
   Table,
   TableBody,
@@ -13,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { resendDelivery } from "../submissions/actions";
-import { RotateCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, RotateCw, Send } from "lucide-react";
 
 export const metadata = { title: "Deliveries · FormHub" };
 
@@ -54,41 +55,32 @@ export default async function DeliveriesPage() {
   };
   for (const g of grouped) counts[g.status] = g._count._all;
 
-  const stats = [
-    { label: "Delivered", value: counts.SUCCEEDED },
-    { label: "Queued", value: counts.PENDING },
-    { label: "Sending", value: counts.PROCESSING },
-    { label: "Failed", value: counts.DEAD },
+  const stats: Stat[] = [
+    { label: "Delivered", value: counts.SUCCEEDED, icon: CheckCircle2, hint: "Alerts that reached their recipient" },
+    { label: "Queued", value: counts.PENDING, icon: Clock, hint: "Waiting for the next attempt" },
+    { label: "Sending", value: counts.PROCESSING, icon: Send, hint: "In flight right now" },
+    { label: "Failed", value: counts.DEAD, icon: AlertTriangle, hint: counts.DEAD > 0 ? "Retries exhausted" : "Nothing has failed", tone: "attention" },
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Deliveries</h1>
-        <p className="text-sm text-muted-foreground">
-          Every alert FormHub has tried to send, and what happened to it.
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="Deliveries"
+        description="Every alert FormHub has tried to send, and what happened to it."
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Card key={s.label}>
-            <CardHeader>
-              <CardDescription>{s.label}</CardDescription>
-              <CardTitle className="text-3xl tabular-nums">{s.value}</CardTitle>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
+      <StatGrid stats={stats} />
 
       <div className="space-y-2">
         <h2 className="text-lg font-medium">Needs attention</h2>
         {problems.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Nothing queued or failed — everything has been delivered.
-          </p>
+          <EmptyState
+            icon={CheckCircle2}
+            title="Everything delivered"
+            description="No alert is queued, retrying or failed. This is where anything needing a human would appear."
+          />
         ) : (
-          <div className="rounded-lg border">
+          <div className="bg-card rounded-xl border shadow-xs">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -150,6 +142,6 @@ export default async function DeliveriesPage() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

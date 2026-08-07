@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { Download } from "lucide-react";
 import { requireAgency } from "@/lib/guards";
 import { countByStatus, listSubmissions } from "@/lib/submissions";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { SubmissionList } from "@/components/submissions/submission-list";
 import { SubmissionFilters } from "@/components/submissions/submission-filters";
+import { PageHeader } from "@/components/page-header";
 import type { SubmissionStatus } from "@/app/generated/prisma/enums";
 
 export const metadata = { title: "Submissions · FormHub" };
@@ -40,24 +40,20 @@ export default async function AgencySubmissionsPage({
   if (nextCursor) nextParams.set("cursor", nextCursor);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Submissions</h1>
-          <p className="text-sm text-muted-foreground">
-            {counts.NEW} new · {counts.READ} read · {counts.ARCHIVED} archived
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          render={
-            <Link href={`/agency/submissions/export?${exportParams.toString()}`} />
-          }
-        >
-          <Download className="size-4" />
-          Export CSV
-        </Button>
-      </div>
+    <>
+      <PageHeader
+        title="Submissions"
+        description={`${counts.NEW} new · ${counts.READ} read · ${counts.ARCHIVED} archived`}
+        actions={
+          <ButtonLink
+            variant="outline"
+            href={`/agency/submissions/export?${exportParams.toString()}`}
+          >
+            <Download className="size-4" />
+            Export CSV
+          </ButtonLink>
+        }
+      />
 
       <SubmissionFilters
         basePath="/agency/submissions"
@@ -70,14 +66,14 @@ export default async function AgencySubmissionsPage({
 
       {nextCursor ? (
         <div className="flex justify-center">
-          <Button
+          <ButtonLink
             variant="outline"
-            render={<Link href={`/agency/submissions?${nextParams.toString()}`} />}
+            href={`/agency/submissions?${nextParams.toString()}`}
           >
             Load older
-          </Button>
+          </ButtonLink>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

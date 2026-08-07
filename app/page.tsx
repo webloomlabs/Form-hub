@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { ArrowRight, Inbox, RefreshCw, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function HomePage() {
@@ -37,13 +36,13 @@ export default function HomePage() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Button render={<Link href="/agency/login" />}>
+        <ButtonLink href="/agency/login">
           Agency sign in
           <ArrowRight className="size-4" />
-        </Button>
-        <Button variant="outline" render={<Link href="/client/login" />}>
+        </ButtonLink>
+        <ButtonLink variant="outline" href="/client/login">
           Website owner sign in
-        </Button>
+        </ButtonLink>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

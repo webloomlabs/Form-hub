@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { requireClient } from "@/lib/guards";
 import { countByStatus, listSubmissions } from "@/lib/submissions";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/button-link";
 import { SubmissionList } from "@/components/submissions/submission-list";
 import { SubmissionFilters } from "@/components/submissions/submission-filters";
+import { PageHeader } from "@/components/page-header";
 import type { SubmissionStatus } from "@/app/generated/prisma/enums";
 
 export const metadata = { title: "Inbox · FormHub" };
@@ -36,13 +36,11 @@ export default async function ClientInboxPage({
   if (nextCursor) nextParams.set("cursor", nextCursor);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Enquiries</h1>
-        <p className="text-sm text-muted-foreground">
-          {counts.NEW} new · {counts.READ} read · {counts.ARCHIVED} archived
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="Enquiries"
+        description={`${counts.NEW} new · ${counts.READ} read · ${counts.ARCHIVED} archived`}
+      />
 
       <SubmissionFilters basePath="/client" status={status} q={q} counts={counts} />
 
@@ -54,14 +52,14 @@ export default async function ClientInboxPage({
 
       {nextCursor ? (
         <div className="flex justify-center">
-          <Button
+          <ButtonLink
             variant="outline"
-            render={<Link href={`/client?${nextParams.toString()}`} />}
+            href={`/client?${nextParams.toString()}`}
           >
             Load older
-          </Button>
+          </ButtonLink>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

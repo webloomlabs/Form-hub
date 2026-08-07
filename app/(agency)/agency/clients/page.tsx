@@ -9,6 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Users } from "lucide-react";
+import { PageHeader, EmptyState } from "@/components/page-header";
 import {
   EditClientDialog,
   InviteDialog,
@@ -40,23 +42,22 @@ export default async function ClientsPage() {
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Clients</h1>
-          <p className="text-sm text-muted-foreground">
-            Website owners you build and manage sites for.
-          </p>
-        </div>
-        <NewClientDialog />
-      </div>
+    <>
+      <PageHeader
+        title="Clients"
+        description="Website owners you build and manage sites for."
+        actions={<NewClientDialog />}
+      />
 
       {rows.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No clients yet. Create one to get started.
-        </p>
+        <EmptyState
+          icon={Users}
+          title="No clients yet"
+          description="Add the website owners you build for. Each one gets their own login and their own inbox."
+          action={<NewClientDialog />}
+        />
       ) : (
-        <div className="rounded-lg border">
+        <div className="bg-card rounded-xl border shadow-xs">
           <Table>
             <TableHeader>
               <TableRow>
@@ -98,6 +99,6 @@ export default async function ClientsPage() {
           </Table>
         </div>
       )}
-    </div>
+    </>
   );
 }
