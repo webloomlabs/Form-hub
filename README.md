@@ -86,9 +86,15 @@ the queue automatically.
 `runDeliveryTick()` is a plain function with two callers, so the deployment
 target is a configuration choice rather than a rewrite:
 
-- **Vercel** — `/api/cron/deliver`, run every minute by `vercel.json`.
+- **Vercel + Upstash QStash** — QStash calls `/api/cron/deliver` on a schedule.
+  Vercel Cron isn't used: the Hobby plan allows only one run per day.
 - **Docker/VPS** — `worker/index.ts`, polling every second.
   `docker compose --profile deploy up -d --build`.
+
+Delivery doesn't wait on the scheduler: each accepted submission, each agency
+page view, and the *Process queue now* button all run a tick, and a tick drains
+whatever is due. The schedule is the safety net for sites with no traffic. See
+[DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Spam handling
 

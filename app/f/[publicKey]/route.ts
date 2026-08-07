@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { checkRateLimit } from "@/lib/ratelimit";
@@ -21,7 +20,7 @@ import {
   type UploadOutcome,
 } from "@/lib/ingest/uploads";
 import { enqueueSubmissionJobs } from "@/lib/delivery/enqueue";
-import { runDeliveryTick } from "@/lib/delivery/tick";
+import { kickDelivery } from "@/lib/delivery/kick";
 
 /**
  * The ingest endpoint: POST /f/{publicKey}
@@ -361,15 +360,10 @@ export async function POST(
     // difference teaches the bot to adapt.
     const response = successResponse(mode, submission.id, form.redirectUrl, headers);
 
-    // Latency optimisation only: the cron/worker remains the guarantee.
+    // Sends the alert now rather than waiting for the scheduler. This is what
+    // makes alerts near-instant regardless of how often QStash fires.
     if (!quarantined) {
-      after(async () => {
-        try {
-          await runDeliveryTick({ batchSize: 5, budgetMs: 10_000 });
-        } catch {
-          // Swallowed on purpose — the queue will be drained on the next tick.
-        }
-      });
+      kickDelivery({ batchSize: 10, budgetMs: 10_000 });
     }
 
     return response;

@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { resendDelivery } from "../submissions/actions";
+import { ProcessQueueButton } from "./deliveries-client";
 import { AlertTriangle, CheckCircle2, Clock, RotateCw, Send } from "lucide-react";
 
 export const metadata = { title: "Deliveries · FormHub" };
@@ -67,6 +68,7 @@ export default async function DeliveriesPage() {
       <PageHeader
         title="Deliveries"
         description="Every alert FormHub has tried to send, and what happened to it."
+        actions={<ProcessQueueButton />}
       />
 
       <StatGrid stats={stats} />

@@ -113,6 +113,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md). Two things that bite:
 ```bash
 npx tsx scripts/test-delivery-retry.ts     # backoff, dead-lettering, the reaper
 npx tsx scripts/test-tenant-isolation.ts   # cross-tenant read/write isolation
+npx tsx scripts/test-cron-auth.ts          # QStash signature + bearer auth
 ```
 
 Run both after touching delivery or any tenant-scoped query.

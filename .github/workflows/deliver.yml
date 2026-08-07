@@ -1,0 +1,56 @@
+name: Drain delivery queue
+
+# A zero-signup alternative to Upstash QStash. Vercel's Hobby plan allows cron
+# only once per day, which is too slow for retrying failed alerts, so an
+# external scheduler drives /api/cron/deliver instead.
+#
+# Setup — repository Settings → Secrets and variables → Actions:
+#   secret   CRON_SECRET  same value as the Vercel env var
+#   variable APP_URL      e.g. https://formhub.example.com  (no trailing slash)
+#
+# Unlike QStash this has no per-message quota, so a tighter interval is free.
+# Delete this file if you use QStash (npm run qstash:setup).
+
+on:
+  schedule:
+    # Every 5 minutes. GitHub queues scheduled runs under load, so treat this
+    # as "roughly every 5-15 minutes" rather than a guarantee.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # manual run from the Actions tab
+
+concurrency:
+  # Ticks are safe to overlap (FOR UPDATE SKIP LOCKED), but there's no reason
+  # to pay for two at once.
+  group: deliver
+  cancel-in-progress: false
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger delivery tick
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL variable or CRON_SECRET secret is not set." >&2
+            exit 1
+          fi
+
+          response=$(curl --silent --show-error --fail-with-body \
+            --request POST \
+            --max-time 120 \
+            --write-out '\n%{http_code}' \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/deliver")
+
+          status=$(printf '%s' "$response" | tail -n1)
+          body=$(printf '%s' "$response" | sed '$d')
+
+          echo "HTTP $status"
+          echo "$body"
+          echo "\`$body\`" >> "$GITHUB_STEP_SUMMARY"
+
+          [ "$status" = "200" ]

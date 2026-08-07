@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/app-shell";
+import { kickDelivery } from "@/lib/delivery/kick";
 import type { NavGroup } from "@/components/app-sidebar";
 
 export default async function AgencyLayout({ children }: LayoutProps<"/agency">) {
@@ -23,6 +24,10 @@ export default async function AgencyLayout({ children }: LayoutProps<"/agency">)
       ? prisma.deliveryJob.count({ where: { agencyId, status: "DEAD" } })
       : 0,
   ]);
+
+  // Any agency page view also drains due delivery jobs, so retries don't wait
+  // on the external scheduler.
+  if (agencyId) kickDelivery({ batchSize: 10, budgetMs: 8_000 });
 
   const groups: NavGroup[] = [
     {
