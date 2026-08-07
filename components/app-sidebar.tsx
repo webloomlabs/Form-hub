@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -31,6 +32,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -79,6 +81,7 @@ export function AppSidebar({
   signOutAction: () => Promise<void>;
 }) {
   const pathname = usePathname();
+  const [signingOut, startSignOut] = useTransition();
 
   const isActive = (item: NavItem) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -166,32 +169,38 @@ export function AppSidebar({
                   </SidebarMenuButton>
                 }
               />
-              <DropdownMenuContent
-                align="end"
-                side="top"
-                className="min-w-56"
-              >
-                <DropdownMenuLabel className="font-normal">
-                  <div className="grid leading-tight">
-                    <span className="truncate text-sm font-medium">
-                      {user.name}
-                    </span>
-                    <span className="text-muted-foreground truncate text-xs">
-                      {user.email}
-                    </span>
-                  </div>
-                </DropdownMenuLabel>
+              <DropdownMenuContent align="end" side="top" className="min-w-56">
+                {/*
+                  DropdownMenuLabel is base-ui's Menu.GroupLabel, which throws
+                  if it has no Group ancestor ("MenuGroupContext is missing").
+                  The Group is required, not decorative.
+                */}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="grid leading-tight">
+                      <span className="truncate text-sm font-medium">
+                        {user.name}
+                      </span>
+                      <span className="text-muted-foreground truncate text-xs">
+                        {user.email}
+                      </span>
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
+                {/*
+                  Calling the action from onClick rather than nesting a <form>
+                  inside the item: a menu item is not a valid form parent, and
+                  the menu closes on click, which can unmount the form before
+                  it submits.
+                */}
                 <DropdownMenuItem
-                  render={
-                    <form action={signOutAction} className="w-full">
-                      <button type="submit" className="flex w-full items-center gap-2">
-                        <LogOut className="size-4" />
-                        Sign out
-                      </button>
-                    </form>
-                  }
-                />
+                  disabled={signingOut}
+                  onClick={() => startSignOut(() => signOutAction())}
+                >
+                  <LogOut className="size-4" />
+                  {signingOut ? "Signing out…" : "Sign out"}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>
