@@ -80,6 +80,8 @@ export async function listSubmissions(
       spamReasons: true,
       subjectPreview: true,
       submitterEmail: true,
+      // Needed by submissionLabel(); the inbox label is derived, not stored.
+      data: true,
       form: { select: { id: true, name: true } },
       site: { select: { id: true, name: true } },
       _count: { select: { files: true, jobs: true } },
@@ -109,4 +111,78 @@ export async function countByStatus(scope: Prisma.SubmissionWhereInput) {
   };
   for (const g of grouped) counts[g.status] = g._count._all;
   return counts;
+}
+
+/**
+ * The one line that identifies a submission in the inbox.
+ *
+ * Prefers a person's name, then email, then phone, then whatever the form put
+ * first. `subjectPreview` is not used: it holds the longest text field, which
+ * is usually the message body — fine for a detail view, useless as a label and
+ * wide enough to blow out the table.
+ *
+ * Derived at render rather than stored, so existing submissions get the new
+ * label without a backfill.
+ */
+
+/** Compared with separators and case stripped, so "Full Name" matches "full_name". */
+const normalizeKey = (key: string) => key.toLowerCase().replace(/[\s_-]+/g, "");
+
+const NAME_KEYS = [
+  "name",
+  "fullname",
+  "yourname",
+  "firstname",
+  "givenname",
+  "contactname",
+];
+const EMAIL_KEYS = ["email", "emailaddress", "youremail", "contactemail"];
+const PHONE_KEYS = [
+  "phone",
+  "phonenumber",
+  "telephone",
+  "mobile",
+  "mobilenumber",
+  "contactnumber",
+];
+
+function firstMatching(
+  entries: [string, unknown][],
+  candidates: string[],
+): string | null {
+  for (const candidate of candidates) {
+    const hit = entries.find(([key]) => normalizeKey(key) === candidate);
+    const value = hit?.[1];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
+  }
+  return null;
+}
+
+export function submissionLabel(
+  data: unknown,
+  fallback?: string | null,
+): string {
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    // Skip the hidden fields the ingest endpoint adds — they are never a label.
+    const entries = Object.entries(data as Record<string, unknown>).filter(
+      ([key]) => !key.startsWith("_"),
+    );
+
+    const named =
+      firstMatching(entries, NAME_KEYS) ??
+      firstMatching(entries, EMAIL_KEYS) ??
+      firstMatching(entries, PHONE_KEYS);
+    if (named) return named;
+
+    // Otherwise the first field with something in it, in submitted order.
+    for (const [, value] of entries) {
+      if (typeof value === "string" && value.trim()) return value.trim();
+      if (typeof value === "number" || typeof value === "boolean") {
+        return String(value);
+      }
+    }
+  }
+
+  return fallback?.trim() || "(no details)";
 }

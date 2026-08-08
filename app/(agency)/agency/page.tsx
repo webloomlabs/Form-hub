@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { requireAgency } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
+import { submissionLabel } from "@/lib/submissions";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/button-link";
 import {
@@ -51,6 +52,7 @@ export default async function AgencyOverviewPage() {
           status: true,
           subjectPreview: true,
           submitterEmail: true,
+          data: true,
           site: { select: { name: true } },
         },
       }),
@@ -142,7 +144,7 @@ export default async function AgencyOverviewPage() {
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">
-                        {s.subjectPreview ?? "(no preview)"}
+                        {submissionLabel(s.data, s.subjectPreview)}
                       </span>
                       <span className="text-muted-foreground block truncate text-xs">
                         {s.submitterEmail ?? "no email"} · {s.site.name}

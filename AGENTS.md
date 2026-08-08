@@ -26,6 +26,10 @@ Corollaries, all of which have bitten already:
 
 - Email and webhooks are **never** sent inline — they are `DeliveryJob` rows
   drained by `lib/delivery/tick.ts`.
+- SMTP `secure` is inferred from the port (465 always implies TLS) and every
+  send error is tagged `[via host:port (secure=…)]`. A bare "Unexpected socket
+  close" tells nobody which setting to change. `requireTLS` is applied only for
+  authenticated, non-local hosts — forcing it everywhere breaks Mailpit.
 - Never persist an empty error string. Use `describeError()` from
   `lib/errors.ts`; the AWS SDK and undici throw errors with empty `.message`
   and the real cause nested in `cause`/`errors`. An empty string renders as
@@ -114,6 +118,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md). Two things that bite:
 npx tsx scripts/test-delivery-retry.ts     # backoff, dead-lettering, the reaper
 npx tsx scripts/test-tenant-isolation.ts   # cross-tenant read/write isolation
 npx tsx scripts/test-cron-auth.ts          # QStash signature + bearer auth
+npm run smtp:test                          # SMTP host/port/TLS + auth, incl. alternatives
 ```
 
 Run both after touching delivery or any tenant-scoped query.

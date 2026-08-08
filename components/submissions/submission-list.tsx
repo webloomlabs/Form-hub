@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Inbox, Paperclip } from "lucide-react";
 import { EmptyState } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { submissionLabel } from "@/lib/submissions";
 import {
   Table,
   TableBody,
@@ -18,6 +19,7 @@ export type SubmissionListItem = {
   spamReasons: string[];
   subjectPreview: string | null;
   submitterEmail: string | null;
+  data: unknown;
   form: { id: string; name: string };
   site: { id: string; name: string };
   _count: { files: number; jobs: number };
@@ -61,51 +63,78 @@ export function SubmissionList({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[110px]">Status</TableHead>
+            <TableHead className="w-27.5">Status</TableHead>
             <TableHead>Submission</TableHead>
-            {showSite ? <TableHead>Site</TableHead> : null}
-            <TableHead>Form</TableHead>
-            <TableHead className="w-[180px] text-right">Received</TableHead>
+            {showSite ? (
+              <TableHead className="hidden md:table-cell">Site</TableHead>
+            ) : null}
+            <TableHead className="hidden md:table-cell">Form</TableHead>
+            <TableHead className="w-45 text-right">Received</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((s) => (
-            <TableRow key={s.id}>
-              <TableCell>{statusBadge(s.status, s.spamReasons)}</TableCell>
-              <TableCell>
-                <Link
-                  href={`${basePath}/${s.id}`}
-                  className={
-                    s.status === "NEW"
-                      ? "font-medium underline-offset-4 hover:underline"
-                      : "underline-offset-4 hover:underline"
-                  }
-                >
-                  {s.subjectPreview ?? "(no preview)"}
-                </Link>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {s.submitterEmail ? <span>{s.submitterEmail}</span> : null}
-                  {s._count.files > 0 ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Paperclip className="size-3" />
-                      {s._count.files}
+          {items.map((s) => {
+            const label = submissionLabel(s.data, s.subjectPreview);
+            return (
+              // `relative` anchors the stretched link below, which is what
+              // makes the whole row clickable without turning this into a
+              // client component or nesting interactive elements.
+              <TableRow
+                key={s.id}
+                className="hover:bg-muted/50 focus-within:bg-muted/50 relative cursor-pointer transition-colors"
+              >
+                <TableCell>{statusBadge(s.status, s.spamReasons)}</TableCell>
+
+                {/*
+                  A table cell only truncates when it has a max-width, so the
+                  long message bodies that used to push Site/Form off-screen
+                  are clipped here instead.
+                */}
+                <TableCell className="max-w-55 sm:max-w-85 lg:max-w-130">
+                  <Link
+                    href={`${basePath}/${s.id}`}
+                    title={label}
+                    // after:absolute + inset-0 stretches the hit area over the
+                    // entire row while keeping a real, focusable anchor.
+                    className="after:absolute after:inset-0 focus-visible:outline-none"
+                  >
+                    <span
+                      className={
+                        s.status === "NEW"
+                          ? "block truncate font-medium"
+                          : "block truncate"
+                      }
+                    >
+                      {label}
                     </span>
-                  ) : null}
-                </div>
-              </TableCell>
-              {showSite ? (
-                <TableCell className="text-muted-foreground">
-                  {s.site.name}
+                  </Link>
+                  <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                    {s.submitterEmail && s.submitterEmail !== label ? (
+                      <span className="truncate">{s.submitterEmail}</span>
+                    ) : null}
+                    {s._count.files > 0 ? (
+                      <span className="inline-flex shrink-0 items-center gap-1">
+                        <Paperclip className="size-3" />
+                        {s._count.files}
+                      </span>
+                    ) : null}
+                  </div>
                 </TableCell>
-              ) : null}
-              <TableCell className="text-muted-foreground">
-                {s.form.name}
-              </TableCell>
-              <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                {s.createdAt.toLocaleString()}
-              </TableCell>
-            </TableRow>
-          ))}
+
+                {showSite ? (
+                  <TableCell className="text-muted-foreground hidden max-w-45 truncate md:table-cell">
+                    {s.site.name}
+                  </TableCell>
+                ) : null}
+                <TableCell className="text-muted-foreground hidden max-w-45 truncate md:table-cell">
+                  {s.form.name}
+                </TableCell>
+                <TableCell className="text-muted-foreground text-right text-sm whitespace-nowrap tabular-nums">
+                  {s.createdAt.toLocaleString()}
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

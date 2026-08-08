@@ -91,6 +91,22 @@ async function loadSubmission(
   });
 }
 
+/**
+ * The next number to show in the delivery log for this job.
+ *
+ * Not `job.attempts`: a manual resend deliberately resets that to zero to give
+ * the job a fresh retry budget, which would restart the log at #1 and produce
+ * duplicate, out-of-order entries. The log is a history, so it counts rows.
+ */
+async function nextAttemptNo(jobId: string): Promise<number> {
+  const last = await prisma.deliveryAttempt.findFirst({
+    where: { jobId },
+    orderBy: { attemptNo: "desc" },
+    select: { attemptNo: true },
+  });
+  return (last?.attemptNo ?? 0) + 1;
+}
+
 async function runJob(job: DeliveryJob): Promise<TickResult> {
   const result: TickResult = {
     claimed: 0,
@@ -100,6 +116,7 @@ async function runJob(job: DeliveryJob): Promise<TickResult> {
     recovered: 0,
   };
   const startedAt = new Date();
+  const attemptNo = await nextAttemptNo(job.id);
   let responseCode: number | null = null;
 
   try {
@@ -120,7 +137,7 @@ async function runJob(job: DeliveryJob): Promise<TickResult> {
       prisma.deliveryAttempt.create({
         data: {
           jobId: job.id,
-          attemptNo: job.attempts,
+          attemptNo,
           status: "SUCCEEDED",
           startedAt,
           finishedAt: new Date(),
@@ -150,7 +167,7 @@ async function runJob(job: DeliveryJob): Promise<TickResult> {
       prisma.deliveryAttempt.create({
         data: {
           jobId: job.id,
-          attemptNo: job.attempts,
+          attemptNo,
           status: "FAILED",
           startedAt,
           finishedAt: new Date(),
