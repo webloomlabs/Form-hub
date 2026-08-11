@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireClient } from "@/lib/guards";
 import type { SubmissionStatus } from "@/app/generated/prisma/enums";
 
-const ALLOWED: SubmissionStatus[] = ["READ", "ARCHIVED", "SPAM"];
+const ALLOWED: SubmissionStatus[] = ["NEW", "READ", "ARCHIVED", "SPAM"];
 
 /**
  * Website owners can triage their own inbox but cannot resend deliveries —
@@ -22,11 +23,18 @@ export async function setClientSubmissionStatus(
   await prisma.submission.updateMany({
     // site.clientId is what keeps one client out of another's submissions.
     where: { id, agencyId, site: { clientId } },
-    data: { status, readAt: status === "READ" ? new Date() : undefined },
+    data: {
+      status,
+      readAt:
+        status === "READ" ? new Date() : status === "NEW" ? null : undefined,
+    },
   });
 
   revalidatePath("/client");
   revalidatePath(`/client/submissions/${id}`);
+
+  // Opening the detail page marks it read, so staying here would undo this.
+  if (status === "NEW") redirect("/client");
 }
 
 export async function markClientRead(

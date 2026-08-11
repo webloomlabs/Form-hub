@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MailOpen } from "lucide-react";
 import { notFound } from "next/navigation";
 import { requireAgency } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubmissionDetail } from "@/components/submissions/submission-detail";
 import { DeliveryLog } from "@/components/submissions/delivery-log";
 import { markRead, resendDelivery, setSubmissionStatus } from "../actions";
+import { submissionLabel } from "@/lib/submissions";
+import { DeleteSubmissionButton } from "./delete-submission";
 
 export const metadata = { title: "Submission · FormHub" };
 
@@ -35,6 +38,10 @@ export default async function AgencySubmissionPage({
   // Opening a new submission marks it read.
   await markRead(submission.id, agencyId);
 
+  // markRead has just flipped NEW -> READ, but `submission` was read before
+  // that, so rendering from it would hide "Mark as unread" on first open.
+  const status = submission.status === "NEW" ? "READ" : submission.status;
+
   const fileUrls: Record<string, string> = {};
   if (isR2Configured()) {
     for (const file of submission.files) {
@@ -52,7 +59,7 @@ export default async function AgencySubmissionPage({
           ← Back to submissions
         </Link>
         <div className="flex gap-2">
-          {submission.status === "SPAM" ? (
+          {status === "SPAM" ? (
             <form action={setSubmissionStatus}>
               <input type="hidden" name="id" value={submission.id} />
               <input type="hidden" name="status" value="READ" />
@@ -69,17 +76,31 @@ export default async function AgencySubmissionPage({
               </Button>
             </form>
           )}
+          {/* Always available: opening the page has already marked it read. */}
+          <form action={setSubmissionStatus}>
+            <input type="hidden" name="id" value={submission.id} />
+            <input type="hidden" name="status" value="NEW" />
+            <Button type="submit" variant="outline" size="sm">
+              <MailOpen className="size-4" />
+              Mark as unread
+            </Button>
+          </form>
           <form action={setSubmissionStatus}>
             <input type="hidden" name="id" value={submission.id} />
             <input
               type="hidden"
               name="status"
-              value={submission.status === "ARCHIVED" ? "READ" : "ARCHIVED"}
+              value={status === "ARCHIVED" ? "READ" : "ARCHIVED"}
             />
             <Button type="submit" variant="outline" size="sm">
-              {submission.status === "ARCHIVED" ? "Unarchive" : "Archive"}
+              {status === "ARCHIVED" ? "Unarchive" : "Archive"}
             </Button>
           </form>
+          <DeleteSubmissionButton
+            id={submission.id}
+            label={submissionLabel(submission.data, submission.subjectPreview)}
+            fileCount={submission.files.length}
+          />
         </div>
       </div>
 

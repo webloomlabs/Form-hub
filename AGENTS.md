@@ -62,6 +62,9 @@ Prisma 7 + `@prisma/adapter-pg` · NextAuth v5 (JWT, Credentials) · Tailwind v4
   `FormData`, returning `ActionState` for `useActionState`, ending in
   `revalidatePath`. API routes only where HTTP is genuinely required: ingest,
   auth, cron, CSV export.
+- **Deletion is agency-only.** `deleteSubmission` opens with `requireAgency()`,
+  which throws for `CLIENT`. Server actions are addressable by id from any
+  signed-in session, so the guard — not the absent button — is the control.
 - **Every action opens with a guard** from `lib/guards.ts` (`requireAgency`,
   `requireAgencyOwner`, `requireClient`) and every tenant query filters by the
   returned `agencyId` (plus `site.clientId` for client scope). Prefer

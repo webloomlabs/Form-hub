@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MailOpen } from "lucide-react";
 import { notFound } from "next/navigation";
 import { requireClient } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +35,10 @@ export default async function ClientSubmissionPage({
 
   await markClientRead(submission.id, agencyId, clientId);
 
+  // markRead has just flipped NEW -> READ, but `submission` was read before
+  // that, so rendering from it would hide "Mark as unread" on first open.
+  const status = submission.status === "NEW" ? "READ" : submission.status;
+
   const fileUrls: Record<string, string> = {};
   if (isR2Configured()) {
     for (const file of submission.files) {
@@ -51,7 +56,7 @@ export default async function ClientSubmissionPage({
           ← Back to enquiries
         </Link>
         <div className="flex gap-2">
-          {submission.status === "SPAM" ? (
+          {status === "SPAM" ? (
             <form action={setClientSubmissionStatus}>
               <input type="hidden" name="id" value={submission.id} />
               <input type="hidden" name="status" value="READ" />
@@ -68,15 +73,24 @@ export default async function ClientSubmissionPage({
               </Button>
             </form>
           )}
+          {/* Always available: opening the page has already marked it read. */}
+          <form action={setClientSubmissionStatus}>
+            <input type="hidden" name="id" value={submission.id} />
+            <input type="hidden" name="status" value="NEW" />
+            <Button type="submit" variant="outline" size="sm">
+              <MailOpen className="size-4" />
+              Mark as unread
+            </Button>
+          </form>
           <form action={setClientSubmissionStatus}>
             <input type="hidden" name="id" value={submission.id} />
             <input
               type="hidden"
               name="status"
-              value={submission.status === "ARCHIVED" ? "READ" : "ARCHIVED"}
+              value={status === "ARCHIVED" ? "READ" : "ARCHIVED"}
             />
             <Button type="submit" variant="outline" size="sm">
-              {submission.status === "ARCHIVED" ? "Unarchive" : "Archive"}
+              {status === "ARCHIVED" ? "Unarchive" : "Archive"}
             </Button>
           </form>
         </div>
