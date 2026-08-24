@@ -17,6 +17,7 @@ export async function GET(request: Request) {
   const status = url.searchParams.get("status") ?? "";
   const q = url.searchParams.get("q") ?? "";
   const formId = url.searchParams.get("formId") ?? undefined;
+  const siteId = url.searchParams.get("siteId") ?? undefined;
 
   const where = buildWhere(
     { agencyId },
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
       status: (status || undefined) as SubmissionStatus | "ALL" | undefined,
       q,
       formId,
+      siteId,
     },
   );
 

@@ -97,10 +97,50 @@ export async function listSubmissions(
   return { items, nextCursor };
 }
 
-export async function countByStatus(scope: Prisma.SubmissionWhereInput) {
+/** A site or form as offered in the filter dropdowns. */
+export type FilterOption = { id: string; name: string };
+export type FormFilterOption = FilterOption & { siteId: string };
+
+/**
+ * The sites and forms a viewer may filter by. Scoped exactly like the
+ * submission list itself: an agency sees its whole tenant, a client only the
+ * sites it owns — so the dropdowns can never name someone else's site.
+ */
+export async function listFilterOptions(scope: {
+  agencyId: string;
+  clientId?: string;
+}): Promise<{ sites: FilterOption[]; forms: FormFilterOption[] }> {
+  const siteWhere: Prisma.SiteWhereInput = {
+    agencyId: scope.agencyId,
+    ...(scope.clientId ? { clientId: scope.clientId } : {}),
+  };
+
+  const [sites, forms] = await Promise.all([
+    prisma.site.findMany({
+      where: siteWhere,
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.form.findMany({
+      where: { agencyId: scope.agencyId, site: siteWhere },
+      select: { id: true, name: true, siteId: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  return { sites, forms };
+}
+
+export async function countByStatus(
+  scope: Prisma.SubmissionWhereInput,
+  filters: Omit<SubmissionFilters, "status" | "cursor"> = {},
+) {
   const grouped = await prisma.submission.groupBy({
     by: ["status"],
-    where: scope,
+    // "ALL" so buildWhere doesn't apply its hide-spam default — the counts
+    // have to span every status, but still honour the site/form/search
+    // narrowing so the tab numbers match what the list shows.
+    where: buildWhere(scope, { ...filters, status: "ALL" }),
     _count: { _all: true },
   });
   const counts: Record<string, number> = {
