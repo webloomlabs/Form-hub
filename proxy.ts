@@ -39,6 +39,9 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Skip static assets and image optimisation; everything else passes through.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|svg|ico)$).*)"],
+  // Only the two portals need a session check; every other path was a no-op
+  // pass-through. Proxy runs as a Node function on Vercel, so matching the
+  // ingest endpoint (and its CORS preflights), /api/* and stray assets paid
+  // for an invocation plus a JWT decrypt on each request for nothing.
+  matcher: ["/agency/:path*", "/client/:path*"],
 };

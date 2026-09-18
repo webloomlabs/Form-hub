@@ -200,7 +200,7 @@ button on the Deliveries page:
 | Trigger | Covers |
 |---|---|
 | Every accepted submission | The alert itself — sent seconds after submission |
-| Every agency page view | Retries of earlier failures, as staff use the app |
+| Every agency page view (at most once a minute per instance) | Retries of earlier failures, as staff use the app |
 | **Process queue now** button | On-demand drain |
 | QStash schedule | Everything else, including sites with no traffic |
 

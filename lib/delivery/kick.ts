@@ -20,9 +20,27 @@ import { runDeliveryTick } from "./tick";
  * once the response is already sent, so none of this is on the critical path.
  * Failures are swallowed deliberately — the next trigger tries again.
  */
+let lastThrottledKickAt = 0;
+
 export function kickDelivery(
-  opts: { batchSize?: number; budgetMs?: number } = {},
+  opts: {
+    batchSize?: number;
+    budgetMs?: number;
+    /**
+     * Skip if this instance already kicked within the window. For page-view
+     * triggers only: navigations and server actions re-render the layout, and
+     * retries can't be due more often than the backoff allows anyway. The
+     * ingest kick stays unthrottled so a new alert always goes out at once.
+     */
+    minIntervalMs?: number;
+  } = {},
 ): void {
+  if (opts.minIntervalMs) {
+    const now = Date.now();
+    if (now - lastThrottledKickAt < opts.minIntervalMs) return;
+    lastThrottledKickAt = now;
+  }
+
   after(async () => {
     try {
       await runDeliveryTick({

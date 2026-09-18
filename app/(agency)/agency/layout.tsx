@@ -26,8 +26,11 @@ export default async function AgencyLayout({ children }: LayoutProps<"/agency">)
   ]);
 
   // Any agency page view also drains due delivery jobs, so retries don't wait
-  // on the external scheduler.
-  if (agencyId) kickDelivery({ batchSize: 10, budgetMs: 8_000 });
+  // on the external scheduler. Throttled per instance: every navigation and
+  // server action re-renders this layout.
+  if (agencyId) {
+    kickDelivery({ batchSize: 10, budgetMs: 8_000, minIntervalMs: 60_000 });
+  }
 
   const groups: NavGroup[] = [
     {
