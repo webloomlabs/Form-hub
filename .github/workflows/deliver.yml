@@ -9,7 +9,10 @@ name: Drain delivery queue
 #   variable APP_URL      e.g. https://formhub.example.com  (no trailing slash)
 #
 # Unlike QStash this has no per-message quota, so a tighter interval is free.
-# Delete this file if you use QStash (npm run qstash:setup).
+#
+# Opt-in: the job is skipped unless APP_URL is set, so a repo that uses QStash
+# (or a fork, which never inherits secrets or variables) doesn't fail every five
+# minutes. Once APP_URL is set, a missing CRON_SECRET fails loudly.
 
 on:
   schedule:
@@ -26,6 +29,7 @@ concurrency:
 
 jobs:
   deliver:
+    if: ${{ vars.APP_URL != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
